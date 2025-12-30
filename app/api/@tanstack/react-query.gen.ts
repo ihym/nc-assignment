@@ -44,7 +44,7 @@ export const getConfigApiPyConfigGetQueryKey = (options?: Options<GetConfigApiPy
 /**
  * Get Config
  *
- * Get the current YAML configuration
+ * Get the current YAML configuration.
  */
 export const getConfigApiPyConfigGetOptions = (options?: Options<GetConfigApiPyConfigGetData>) => queryOptions<GetConfigApiPyConfigGetResponse, DefaultError, GetConfigApiPyConfigGetResponse, ReturnType<typeof getConfigApiPyConfigGetQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -62,7 +62,7 @@ export const getConfigApiPyConfigGetOptions = (options?: Options<GetConfigApiPyC
 /**
  * Update Config
  *
- * Update the YAML configuration
+ * Update the YAML configuration.
  */
 export const updateConfigApiPyConfigPostMutation = (options?: Partial<Options<UpdateConfigApiPyConfigPostData>>): UseMutationOptions<UpdateConfigApiPyConfigPostResponse, UpdateConfigApiPyConfigPostError, Options<UpdateConfigApiPyConfigPostData>> => {
     const mutationOptions: UseMutationOptions<UpdateConfigApiPyConfigPostResponse, UpdateConfigApiPyConfigPostError, Options<UpdateConfigApiPyConfigPostData>> = {
@@ -81,7 +81,7 @@ export const updateConfigApiPyConfigPostMutation = (options?: Partial<Options<Up
 /**
  * Post Completions
  *
- * Get completions for the current cursor position
+ * Get completions for the current cursor position.
  */
 export const postCompletionsApiPyCompletionsPostMutation = (options?: Partial<Options<PostCompletionsApiPyCompletionsPostData>>): UseMutationOptions<PostCompletionsApiPyCompletionsPostResponse, PostCompletionsApiPyCompletionsPostError, Options<PostCompletionsApiPyCompletionsPostData>> => {
     const mutationOptions: UseMutationOptions<PostCompletionsApiPyCompletionsPostResponse, PostCompletionsApiPyCompletionsPostError, Options<PostCompletionsApiPyCompletionsPostData>> = {

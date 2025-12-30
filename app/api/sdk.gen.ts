@@ -21,14 +21,14 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 /**
  * Get Config
  *
- * Get the current YAML configuration
+ * Get the current YAML configuration.
  */
 export const getConfigApiPyConfigGet = <ThrowOnError extends boolean = false>(options?: Options<GetConfigApiPyConfigGetData, ThrowOnError>) => (options?.client ?? client).get<GetConfigApiPyConfigGetResponses, unknown, ThrowOnError>({ url: '/api/py/config', ...options });
 
 /**
  * Update Config
  *
- * Update the YAML configuration
+ * Update the YAML configuration.
  */
 export const updateConfigApiPyConfigPost = <ThrowOnError extends boolean = false>(options: Options<UpdateConfigApiPyConfigPostData, ThrowOnError>) => (options.client ?? client).post<UpdateConfigApiPyConfigPostResponses, UpdateConfigApiPyConfigPostErrors, ThrowOnError>({
     url: '/api/py/config',
@@ -42,7 +42,7 @@ export const updateConfigApiPyConfigPost = <ThrowOnError extends boolean = false
 /**
  * Post Completions
  *
- * Get completions for the current cursor position
+ * Get completions for the current cursor position.
  */
 export const postCompletionsApiPyCompletionsPost = <ThrowOnError extends boolean = false>(options: Options<PostCompletionsApiPyCompletionsPostData, ThrowOnError>) => (options.client ?? client).post<PostCompletionsApiPyCompletionsPostResponses, PostCompletionsApiPyCompletionsPostErrors, ThrowOnError>({
     url: '/api/py/completions',
