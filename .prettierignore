@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Generated files
+app/api/
+
+# Lock files
+pnpm-lock.yaml
+uv.lock
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
