@@ -32,36 +32,21 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.62.0
         version: 5.90.16(react@19.2.3)
-      '@types/node':
-        specifier: ^22.10.0
-        version: 22.19.3
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.7
-      '@types/react-dom':
-        specifier: ^19.0.0
-        version: 19.2.3(@types/react@19.2.7)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
-      concurrently:
-        specifier: ^9.0.1
-        version: 9.2.1
-      eslint:
-        specifier: ^9.17.0
-        version: 9.39.2(jiti@2.6.1)
-      eslint-config-next:
-        specifier: ^15.1.0
-        version: 15.5.9(eslint@9.39.2(jiti@2.6.1))(typescript@5.6.2)
       js-yaml:
         specifier: ^4.1.0
         version: 4.1.1
       lucide-react:
         specifier: ^0.468.0
         version: 0.468.0(react@19.2.3)
+      monaco-editor:
+        specifier: ^0.55.1
+        version: 0.55.1
       next:
         specifier: ^15.1.0
         version: 15.5.9(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -77,9 +62,6 @@ importers:
       tailwindcss:
         specifier: ^4.0.0
         version: 4.1.18
-      typescript:
-        specifier: 5.6.2
-        version: 5.6.2
     devDependencies:
       '@hey-api/openapi-ts':
         specifier: ^0.89.0
@@ -87,12 +69,33 @@ importers:
       '@types/js-yaml':
         specifier: ^4.0.9
         version: 4.0.9
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.19.3
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.7
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.7)
+      concurrently:
+        specifier: ^9.0.1
+        version: 9.2.1
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.2(jiti@2.6.1)
+      eslint-config-next:
+        specifier: ^15.1.0
+        version: 15.5.9(eslint@9.39.2(jiti@2.6.1))(typescript@5.6.2)
       prettier:
         specifier: ^3.7.4
         version: 3.7.4
       prettier-plugin-tailwindcss:
         specifier: ^0.7.2
         version: 0.7.2(prettier@3.7.4)
+      typescript:
+        specifier: 5.6.2
+        version: 5.6.2
 
 packages:
 

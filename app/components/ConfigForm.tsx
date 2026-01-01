@@ -1,6 +1,6 @@
 'use client';
 
-import { Config } from '../types/config';
+import { Config } from '@/app/api/types.gen';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { Label } from '@/app/components/ui/label';
 import { Switch } from '@/app/components/ui/switch';
