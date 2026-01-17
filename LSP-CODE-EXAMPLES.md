@@ -10,171 +10,133 @@ High-level code structure for implementing LSP with pygls. See [ARCHITECTURE-LSP
 
 ```python
 from pygls.server import LanguageServer
-from pygls.lsp.server import LanguageServer
 from lsprotocol import types as lsp
 
-# Create server instance (singleton, handles multiple connections)
 server = LanguageServer("yaml-config-server", "v1.0")
-
-@server.feature(lsp.TEXT_DOCUMENT_DID_OPEN)
-async def did_open(params: lsp.DidOpenTextDocumentParams):
-    """Called when a document is opened."""
-    await validate_document(params.text_document.uri)
 
 @server.feature(lsp.TEXT_DOCUMENT_DID_CHANGE)
 async def did_change(params: lsp.DidChangeTextDocumentParams):
-    """Called on every keystroke."""
     await validate_document(params.text_document.uri)
 
 @server.feature(lsp.TEXT_DOCUMENT_COMPLETION)
 async def completions(params: lsp.CompletionParams) -> lsp.CompletionList:
-    """Provide completions at cursor position."""
     doc = server.workspace.get_text_document(params.text_document.uri)
-    position = params.position
-
-    # Analyze YAML structure at position
-    items = get_completions_for_position(doc.source, position)
-
+    items = get_completions_for_position(doc.source, params.position)
     return lsp.CompletionList(is_incomplete=False, items=items)
-
-@server.feature(lsp.TEXT_DOCUMENT_HOVER)
-async def hover(params: lsp.HoverParams) -> lsp.Hover | None:
-    """Show documentation on hover."""
-    doc = server.workspace.get_text_document(params.text_document.uri)
-    key = get_key_at_position(doc.source, params.position)
-
-    if key and key in FIELD_DOCS:
-        return lsp.Hover(contents=lsp.MarkupContent(
-            kind=lsp.MarkupKind.Markdown,
-            value=FIELD_DOCS[key]
-        ))
-    return None
 ```
 
 ### 2. Validation with Pydantic (`api/lsp/validation.py`)
 
+ruamel.yaml and Pydantic work in sequence:
+
 ```python
-import yaml
+from ruamel.yaml import YAML
 from pydantic import ValidationError
-from lsprotocol import types as lsp
-from api.config import ConfigModel  # Reuse existing Pydantic model
+from api.config import ConfigModel
+
+yaml_parser = YAML()
 
 async def validate_document(uri: str):
-    """Parse YAML and validate against Pydantic model."""
-    doc = server.workspace.get_text_document(uri)
-    diagnostics: list[lsp.Diagnostic] = []
+    text_doc = server.workspace.get_text_document(uri)
+    diagnostics = []
+
+    # 1. Parse with ruamel (keeps AST with positions)
+    doc = yaml_parser.load(text_doc.source)
 
     try:
-        # Parse YAML
-        data = yaml.safe_load(doc.source)
-
-        # Validate with Pydantic
-        ConfigModel.model_validate(data)
-
-    except yaml.YAMLError as e:
-        # YAML syntax error
-        diagnostics.append(lsp.Diagnostic(
-            range=lsp.Range(
-                start=lsp.Position(line=e.problem_mark.line, character=0),
-                end=lsp.Position(line=e.problem_mark.line, character=100),
-            ),
-            message=str(e.problem),
-            severity=lsp.DiagnosticSeverity.Error,
-        ))
-
+        # 2. Validate dict with Pydantic
+        ConfigModel.model_validate(dict(doc))
     except ValidationError as e:
-        # Pydantic validation errors
         for error in e.errors():
-            line = find_line_for_path(doc.source, error['loc'])
-            diagnostics.append(lsp.Diagnostic(
-                range=lsp.Range(
-                    start=lsp.Position(line=line, character=0),
-                    end=lsp.Position(line=line, character=100),
-                ),
-                message=error['msg'],
-                severity=lsp.DiagnosticSeverity.Error,
-            ))
+            # 3. Map error path → line number via ruamel AST
+            #    error['loc'] = ('server', 'port')
+            #    doc['server'].lc.key('port') → (line, col)
+            line = find_line_for_path(doc, error['loc'])
+            diagnostics.append(Diagnostic(line=line, message=error['msg']))
 
-    # Send diagnostics to client
     server.publish_diagnostics(uri, diagnostics)
 ```
 
-### 3. Completions from Pydantic Schema (`api/lsp/completions.py`)
+### 3. YAML AST Utilities (`api/lsp/yaml_ast.py`)
+
+`ruamel.yaml` parses YAML into an AST where every node has `.lc` (line/column) info:
 
 ```python
-from lsprotocol import types as lsp
-from api.config import ConfigModel
+from ruamel.yaml import YAML
 
-def get_completions_for_position(source: str, position: lsp.Position) -> list[lsp.CompletionItem]:
-    """Generate completions based on Pydantic model schema."""
+yaml = YAML()
+doc = yaml.load("server:\n  port: 8080")
 
-    # Get the current path in YAML (e.g., ["server", ""])
-    path = get_yaml_path_at_position(source, position)
-
-    # Navigate Pydantic schema to find valid keys
-    schema = ConfigModel.model_json_schema()
-    valid_keys = get_keys_at_path(schema, path)
-
-    return [
-        lsp.CompletionItem(
-            label=key,
-            kind=lsp.CompletionItemKind.Property,
-            detail=info.get('type', ''),
-            documentation=info.get('description', ''),
-            insert_text=f"{key}: ",
-        )
-        for key, info in valid_keys.items()
-    ]
+# Access position info via .lc
+doc.lc.key('server')           # → (0, 0) - line/col of 'server'
+doc['server'].lc.key('port')   # → (1, 2) - line/col of 'port'
+doc['server'].lc.value('port') # → (1, 8) - line/col of '8080'
 ```
 
-### 4. FastAPI WebSocket Integration (`api/index.py`)
+Key functions to implement:
 
 ```python
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from api.lsp.server import server as lsp_server
+def find_line_for_path(doc, path: tuple) -> int:
+    """Map Pydantic error path → line number using ruamel AST."""
+    node = doc
+    line = 0
+    for key in path:
+        if key in node:
+            line, _ = node.lc.key(key)  # Get line from AST
+            node = node[key]
+    return line
 
-app = FastAPI()
+def get_yaml_path_at_position(doc, line: int) -> list[str]:
+    """Walk AST to find path at cursor line. e.g. ['server', 'port']"""
+    # Check each key's node.lc.key() to find which contains target line
+    ...
+```
 
+### 4. Completions from Pydantic Schema (`api/lsp/completions.py`)
+
+```python
+from api.config import ConfigModel
+from api.lsp.yaml_ast import get_yaml_path_at_position
+
+def get_completions_for_position(source: str, position) -> list:
+    # 1. Use AST to find cursor's path in YAML
+    path = get_yaml_path_at_position(source, position.line)
+
+    # 2. Navigate Pydantic schema to that path
+    schema = ConfigModel.model_json_schema()
+    valid_keys = get_keys_at_schema_path(schema, path)
+
+    # 3. Return completions for valid keys
+    return [CompletionItem(label=key, ...) for key in valid_keys]
+```
+
+### 5. FastAPI WebSocket Integration (`api/index.py`)
+
+```python
 @app.websocket("/api/py/lsp")
 async def lsp_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for LSP communication."""
     await websocket.accept()
-
-    try:
-        # pygls handles the LSP protocol over this WebSocket
-        await lsp_server.serve_websocket(websocket)
-    except WebSocketDisconnect:
-        pass  # Client disconnected normally
+    await lsp_server.serve_websocket(websocket)
 ```
 
 ---
 
 ## Frontend: Monaco + LSP Client
 
-### 1. LSP Client Setup (`app/lib/lsp-client.ts`)
+### LSP Client Setup (`app/lib/lsp-client.ts`)
 
 ```typescript
 import { MonacoLanguageClient } from 'monaco-languageclient';
-import { initServices } from 'monaco-languageclient/vscode/services';
 import { toSocket, WebSocketMessageReader, WebSocketMessageWriter } from 'vscode-ws-jsonrpc';
 
-let client: MonacoLanguageClient | null = null;
-
 export async function initLspClient() {
-  // Initialize Monaco services (once, globally)
-  await initServices({});
-
-  // Connect to pygls server
   const ws = new WebSocket('ws://localhost:8000/api/py/lsp');
 
   ws.onopen = () => {
     const socket = toSocket(ws);
-
-    client = new MonacoLanguageClient({
+    const client = new MonacoLanguageClient({
       name: 'YAML Config Client',
-      clientOptions: {
-        documentSelector: [{ language: 'yaml' }],
-      },
+      clientOptions: { documentSelector: [{ language: 'yaml' }] },
       connectionProvider: {
         get: () =>
           Promise.resolve({
@@ -183,73 +145,8 @@ export async function initLspClient() {
           }),
       },
     });
-
     client.start();
   };
-
-  ws.onclose = () => {
-    // Auto-reconnect after delay
-    setTimeout(initLspClient, 3000);
-  };
-}
-
-export function disposeLspClient() {
-  client?.stop();
-  client = null;
-}
-```
-
-### 2. Monaco Editor Component (`app/components/YamlEditor.tsx`)
-
-```tsx
-'use client';
-
-import { useEffect, useRef } from 'react';
-import Editor, { OnMount } from '@monaco-editor/react';
-import { initLspClient, disposeLspClient } from '@/lib/lsp-client';
-
-interface YamlEditorProps {
-  value: string;
-  onChange: (value: string) => void;
-}
-
-export function YamlEditor({ value, onChange }: YamlEditorProps) {
-  const initialized = useRef(false);
-
-  useEffect(() => {
-    if (!initialized.current) {
-      initialized.current = true;
-      initLspClient();
-    }
-
-    return () => {
-      disposeLspClient();
-    };
-  }, []);
-
-  const handleMount: OnMount = (editor, monaco) => {
-    // Set document URI so LSP can track it
-    const model = editor.getModel();
-    if (model) {
-      monaco.editor.setModelUri(model, monaco.Uri.parse('file:///config.yaml'));
-    }
-  };
-
-  return (
-    <Editor
-      height="400px"
-      defaultLanguage="yaml"
-      value={value}
-      onChange={(v) => onChange(v ?? '')}
-      onMount={handleMount}
-      options={{
-        minimap: { enabled: false },
-        lineNumbers: 'on',
-        quickSuggestions: true,
-        suggestOnTriggerCharacters: true,
-      }}
-    />
-  );
 }
 ```
 
